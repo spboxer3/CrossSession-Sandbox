@@ -1,0 +1,71 @@
+{
+  "extensionName": {
+    "message": "CrossSession Sandbox - 多帳號管理與 CORS 跨域神器"
+  },
+  "extensionDescription": {
+    "message": "無縫切換帳號並繞過 CORS 限制。"
+  },
+  "popupTitle": {
+    "message": "CrossSession Sandbox"
+  },
+  "currentDomainLabel": {
+    "message": "當前網域"
+  },
+  "activeSandboxLabel": {
+    "message": "目前沙箱"
+  },
+  "createSandboxTitle": {
+    "message": "建立沙箱"
+  },
+  "nameLabel": {
+    "message": "沙箱名稱"
+  },
+  "namePlaceholder": {
+    "message": "例如：公司帳號"
+  },
+  "expiryLabel": {
+    "message": "自動銷毀於 (選填)"
+  },
+  "corsLabel": {
+    "message": "啟用 CORS 繞過"
+  },
+  "createBtn": {
+    "message": "建立沙箱"
+  },
+  "listTitle": {
+    "message": "使用中的沙箱"
+  },
+  "activeBadge": {
+    "message": "使用中"
+  },
+  "switchBtn": {
+    "message": "切換"
+  },
+  "editBtn": {
+    "message": "編輯"
+  },
+  "saveBtn": {
+    "message": "儲存"
+  },
+  "cancelBtn": {
+    "message": "取消"
+  },
+  "deleteBtn": {
+    "message": "刪除"
+  },
+  "expiresPrefix": {
+    "message": "結束於: "
+  },
+  "noExpiry": {
+    "message": "無期限"
+  },
+  "contextSwitchTo": {
+    "message": "切換至: "
+  },
+  "contextDefaultActive": {
+    "message": "預設 (使用中)"
+  },
+  "contextActiveSuffix": {
+    "message": " (使用中)"
+  }
+}

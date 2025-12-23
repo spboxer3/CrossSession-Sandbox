@@ -1,0 +1,71 @@
+{
+  "extensionName": {
+    "message": "CrossSession Sandbox - Multi-Account & CORS Manager"
+  },
+  "extensionDescription": {
+    "message": "Seamlessly switch accounts and bypass CORS restrictions."
+  },
+  "popupTitle": {
+    "message": "CrossSession Sandbox"
+  },
+  "currentDomainLabel": {
+    "message": "Current Domain"
+  },
+  "activeSandboxLabel": {
+    "message": "Active Sandbox"
+  },
+  "createSandboxTitle": {
+    "message": "Create Sandbox"
+  },
+  "nameLabel": {
+    "message": "Sandbox Name"
+  },
+  "namePlaceholder": {
+    "message": "e.g. Work Account"
+  },
+  "expiryLabel": {
+    "message": "Auto-destroy After (Optional)"
+  },
+  "corsLabel": {
+    "message": "Enable CORS Bypass"
+  },
+  "createBtn": {
+    "message": "Create Sandbox"
+  },
+  "listTitle": {
+    "message": "Active Sandboxes"
+  },
+  "activeBadge": {
+    "message": "Active"
+  },
+  "switchBtn": {
+    "message": "Switch"
+  },
+  "editBtn": {
+    "message": "Edit"
+  },
+  "saveBtn": {
+    "message": "Save"
+  },
+  "cancelBtn": {
+    "message": "Cancel"
+  },
+  "deleteBtn": {
+    "message": "Del"
+  },
+  "expiresPrefix": {
+    "message": "Ends: "
+  },
+  "noExpiry": {
+    "message": "No expiry"
+  },
+  "contextSwitchTo": {
+    "message": "Switch to: "
+  },
+  "contextDefaultActive": {
+    "message": "Default (Active)"
+  },
+  "contextActiveSuffix": {
+    "message": " (Active)"
+  }
+}
