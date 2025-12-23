@@ -11,8 +11,19 @@ import {
 } from "./storage.js";
 
 // Initialize context menus
+// Initialize context menus and restore CORS rules
 chrome.runtime.onInstalled.addListener(async () => {
   await updateContextMenus();
+
+  // Restore CORS rules based on current sandbox state
+  const currentId = await getCurrentSandbox();
+  const sandboxes = await getSandboxes();
+  const currentSandbox = sandboxes.find((s) => s.id === currentId);
+  if (currentSandbox && currentSandbox.corsEnabled) {
+    await updateCorsRules(true);
+  } else {
+    await updateCorsRules(false);
+  }
 });
 
 let isUpdatingContextMenus = false;
@@ -254,64 +265,8 @@ async function switchSandbox(targetId) {
   const sandboxes = await getSandboxes();
   const targetSandbox = sandboxes.find((s) => s.id === targetId);
 
-  const rules = [
-    {
-      id: 1,
-      priority: 1,
-      action: {
-        type: "modifyHeaders",
-        responseHeaders: [
-          {
-            header: "Access-Control-Allow-Origin",
-            operation: "set",
-            value: "*",
-          },
-          {
-            header: "Access-Control-Allow-Methods",
-            operation: "set",
-            value:
-              "GET, PUT, POST, DELETE, HEAD, OPTIONS, PATCH, PROPFIND, PROPPATCH, MKCOL, COPY, MOVE, LOCK",
-          },
-          {
-            header: "Access-Control-Allow-Headers",
-            operation: "set",
-            value: "*",
-          },
-        ],
-      },
-      condition: {
-        urlFilter: "*",
-        resourceTypes: [
-          "main_frame",
-          "sub_frame",
-          "stylesheet",
-          "script",
-          "image",
-          "font",
-          "object",
-          "xmlhttprequest",
-          "ping",
-          "csp_report",
-          "media",
-          "websocket",
-          "other",
-        ],
-      },
-    },
-  ];
-
-  if (targetSandbox && targetSandbox.corsEnabled) {
-    console.log("Enabling CORS Bypass for sandbox:", targetSandbox.name);
-    await chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [1], // clear old first just in case
-      addRules: rules,
-    });
-  } else {
-    console.log("Disabling CORS Bypass");
-    await chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [1],
-    });
-  }
+  // Default to true if undefined
+  await updateCorsRules(targetSandbox && targetSandbox.corsEnabled);
 
   // 7. Reload active tab
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -413,3 +368,118 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     await checkAndApplyDomainRule(tab);
   }
 });
+
+// --- Helper: CORS Rules Manager ---
+async function updateCorsRules(enable) {
+  if (enable) {
+    console.log("Enabling CORS Bypass Rules (Split Strategy)");
+    const rules = [
+      // Rule 1: Resources (AJAX/Images/etc) - Nuclear Mode
+      // Anonymize requests and inject wildcard Access-Control
+      {
+        id: 1,
+        priority: 9999,
+        action: {
+          type: "modifyHeaders",
+          requestHeaders: [
+            { header: "Origin", operation: "remove" },
+            { header: "Referer", operation: "remove" },
+          ],
+          responseHeaders: [
+            // Add Permissive CORS Headers
+            {
+              header: "Access-Control-Allow-Origin",
+              operation: "set",
+              value: "*",
+            },
+            {
+              header: "Access-Control-Allow-Methods",
+              operation: "set",
+              value:
+                "GET, PUT, POST, DELETE, HEAD, OPTIONS, PATCH, PROPFIND, PROPPATCH, MKCOL, COPY, MOVE, LOCK",
+            },
+            {
+              header: "Access-Control-Allow-Headers",
+              operation: "set",
+              value: "*",
+            },
+            {
+              header: "Access-Control-Allow-Private-Network",
+              operation: "set",
+              value: "true",
+            },
+
+            // Strip Restrictive Headers
+            { header: "Content-Security-Policy", operation: "remove" },
+            {
+              header: "Content-Security-Policy-Report-Only",
+              operation: "remove",
+            },
+            { header: "X-Frame-Options", operation: "remove" },
+            { header: "Referrer-Policy", operation: "remove" },
+            { header: "Cross-Origin-Resource-Policy", operation: "remove" },
+            { header: "Cross-Origin-Embedder-Policy", operation: "remove" },
+            { header: "Cross-Origin-Opener-Policy", operation: "remove" },
+
+            // CRITICAL: Remove Credentials to allow Wildcard Origin (*)
+            { header: "Access-Control-Allow-Credentials", operation: "remove" },
+          ],
+        },
+        condition: {
+          urlFilter: "*",
+          resourceTypes: [
+            "stylesheet",
+            "script",
+            "image",
+            "font",
+            "object",
+            "xmlhttprequest",
+            "ping",
+            "csp_report",
+            "media",
+            "websocket",
+            "other",
+          ],
+        },
+      },
+      // Rule 2: Frames (Iframe/Main) - Compatibility Mode
+      // KEEP Referer/Origin (for site validation)
+      // STRIP X-Frame/CSP (for embedding)
+      // DO NOT Inject Wildcard * (to preserve Cookie/Credentials)
+      {
+        id: 2,
+        priority: 9999,
+        action: {
+          type: "modifyHeaders",
+          responseHeaders: [
+            // Only remove embedding restrictions
+            { header: "X-Frame-Options", operation: "remove" },
+            { header: "Content-Security-Policy", operation: "remove" },
+            {
+              header: "Content-Security-Policy-Report-Only",
+              operation: "remove",
+            }, // Added report-only removal
+            { header: "Frame-Ancestors", operation: "remove" },
+            { header: "Cross-Origin-Resource-Policy", operation: "remove" },
+            { header: "Cross-Origin-Embedder-Policy", operation: "remove" },
+            { header: "Cross-Origin-Opener-Policy", operation: "remove" },
+          ],
+        },
+        condition: {
+          urlFilter: "*",
+          resourceTypes: ["main_frame", "sub_frame"],
+        },
+      },
+    ];
+
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: [1, 2],
+      addRules: rules,
+    });
+  } else {
+    console.log("Disabling CORS Bypass Rules");
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: [1, 2],
+    });
+  }
+}

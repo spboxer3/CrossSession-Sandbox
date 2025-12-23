@@ -44,7 +44,7 @@ We request the minimum permissions necessary to provide the core features of Cro
 ### `declarativeNetRequest`
 
 - **Why:** To enable the "CORS Bypass" feature for developers.
-- **Usage:** Used **only** when you explicitly enable "CORS Bypass" on a specific sandbox. It allows the extension to modify network response headers (e.g., `Access-Control-Allow-Origin`) to facilitate cross-origin resource sharing for development purposes.
+- **Usage:** Used **only** when you explicitly enable "CORS Bypass" on a specific sandbox. It allows the extension to modify network headers (e.g., removing `Referer`/`Origin` from requests, injecting `Access-Control-Allow-*` in responses) to facilitate cross-origin resource sharing for development purposes.
 
 ## 3. Data Security
 
