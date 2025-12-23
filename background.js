@@ -6,6 +6,7 @@ import {
   saveSandboxCookies,
   getSandboxForDomain,
   setSandboxForDomain,
+  getDomainsForSandbox,
   STORAGE_KEYS,
 } from "./storage.js";
 
@@ -168,58 +169,86 @@ async function switchSandbox(targetId) {
   const currentId = await getCurrentSandbox();
   if (currentId === targetId) return;
 
-  // 1. Save current cookies
+  // 1. Identify Managed Domains
+  // Get domains managed by current and target sandboxes
+  const currentRules = await getDomainsForSandbox(currentId);
+  const targetRules = await getDomainsForSandbox(targetId);
+
+  // 2. Save Current Cookies (Differential Save)
+  // Only save cookies that match the current sandbox's rules
   const allCookies = await chrome.cookies.getAll({});
-  await saveSandboxCookies(currentId, allCookies);
 
-  // 2. Clear current cookies
-  const removePromises = allCookies.map((cookie) => {
-    const protocol = cookie.secure ? "https:" : "http:";
-    const url = `${protocol}//${cookie.domain}${cookie.path}`;
-    return chrome.cookies.remove({
-      url,
-      name: cookie.name,
-      storeId: cookie.storeId,
-    });
-  });
-  await Promise.all(removePromises);
+  if (currentRules.length > 0) {
+    const cookiesToSave = allCookies.filter((cookie) =>
+      isDomainMatch(cookie.domain, currentRules)
+    );
+    await saveSandboxCookies(currentId, cookiesToSave);
+  }
 
-  // 3. Load target cookies
+  // 3. Clear Relevant Cookies (Differential Wipe)
+  // Clear cookies belonging to EITHER current OR target rules.
+  // We clear current rules to "put them away".
+  // We clear target rules to "make room" for new ones (and remove any leaks).
+  // Unmanaged domains (Globals) are left untouched.
+  const affectedDomains = [...new Set([...currentRules, ...targetRules])];
+
+  if (affectedDomains.length > 0) {
+    const removePromises = allCookies
+      .filter((cookie) => isDomainMatch(cookie.domain, affectedDomains))
+      .map((cookie) => {
+        const protocol = cookie.secure ? "https:" : "http:";
+        const url = `${protocol}//${cookie.domain}${cookie.path}`;
+        return chrome.cookies.remove({
+          url,
+          name: cookie.name,
+          storeId: cookie.storeId,
+        });
+      });
+    await Promise.all(removePromises);
+  }
+
+  // 4. Load Target Cookies
   const targetCookies = await getSandboxCookies(targetId);
-  const setPromises = targetCookies.map(async (cookieData) => {
-    const { hostOnly, session, storeId, ...cleanCookie } = cookieData;
+  if (targetRules.length > 0 && targetCookies.length > 0) {
+    const setPromises = targetCookies
+      // Validation: Only load cookies that actually match target rules
+      // This prevents "leaked" cookies from old saves from polluting global space
+      .filter((cookie) => isDomainMatch(cookie.domain, targetRules))
+      .map(async (cookieData) => {
+        const { hostOnly, session, storeId, ...cleanCookie } = cookieData;
 
-    const protocol = cleanCookie.secure ? "https:" : "http:";
-    const domain = cleanCookie.domain.startsWith(".")
-      ? cleanCookie.domain.substring(1)
-      : cleanCookie.domain;
-    cleanCookie.url = `${protocol}//${domain}${cleanCookie.path}`;
+        const protocol = cleanCookie.secure ? "https:" : "http:";
+        const domain = cleanCookie.domain.startsWith(".")
+          ? cleanCookie.domain.substring(1)
+          : cleanCookie.domain;
+        cleanCookie.url = `${protocol}//${domain}${cleanCookie.path}`;
 
-    // Remove properties that cause errors in set()
-    if (hostOnly) {
-      delete cleanCookie.domain;
-    }
+        // Remove properties that cause errors in set()
+        if (hostOnly) {
+          delete cleanCookie.domain;
+        }
 
-    // Strict rules for __Host- cookies
-    if (cleanCookie.name.startsWith("__Host-")) {
-      cleanCookie.secure = true;
-      delete cleanCookie.domain;
-    }
+        // Strict rules for __Host- cookies
+        if (cleanCookie.name.startsWith("__Host-")) {
+          cleanCookie.secure = true;
+          delete cleanCookie.domain;
+        }
 
-    try {
-      await chrome.cookies.set(cleanCookie);
-    } catch (e) {
-      // Ignore specific harmless errors or log them
-      console.error(`Error setting cookie ${cleanCookie.name}:`, e);
-    }
-  });
-  await Promise.all(setPromises);
+        try {
+          await chrome.cookies.set(cleanCookie);
+        } catch (e) {
+          // Ignore specific harmless errors or log them
+          console.error(`Error setting cookie ${cleanCookie.name}:`, e);
+        }
+      });
+    await Promise.all(setPromises);
+  }
 
-  // 4. Update state
+  // 5. Update state
   await setCurrentSandbox(targetId);
   await updateContextMenus();
 
-  // 5. Apply/Remove CORS Rules (declarativeNetRequest)
+  // 6. Apply/Remove CORS Rules (declarativeNetRequest)
   // We need to check if the target sandbox has CORS enabled.
   // getSandboxes has the list.
   const sandboxes = await getSandboxes();
@@ -284,11 +313,29 @@ async function switchSandbox(targetId) {
     });
   }
 
-  // 6. Reload active tab
+  // 7. Reload active tab
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tab) {
     chrome.tabs.reload(tab.id);
   }
+}
+
+function isDomainMatch(cookieDomain, managedDomains) {
+  if (!managedDomains || managedDomains.length === 0) return false;
+
+  // Normalize cookie domain (remove leading dot for easier comparison)
+  const cleanCookieDomain = cookieDomain.startsWith(".")
+    ? cookieDomain.substring(1)
+    : cookieDomain;
+
+  return managedDomains.some((rule) => {
+    // Exact match: "google.com" == "google.com"
+    if (cleanCookieDomain === rule) return true;
+    // Subdomain match: "mail.google.com" check "google.com"
+    // Must end with .rule
+    if (cleanCookieDomain.endsWith("." + rule)) return true;
+    return false;
+  });
 }
 
 // Handle alarms for auto-destruction

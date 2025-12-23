@@ -68,3 +68,8 @@ export async function setSandboxForDomain(domain, sandboxId) {
   }
   await saveDomainRules(rules);
 }
+
+export async function getDomainsForSandbox(sandboxId) {
+  const rules = await getDomainRules();
+  return Object.keys(rules).filter((domain) => rules[domain] === sandboxId);
+}
