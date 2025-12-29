@@ -228,28 +228,45 @@ async function switchSandbox(targetId) {
       .map(async (cookieData) => {
         const { hostOnly, session, storeId, ...cleanCookie } = cookieData;
 
-        const protocol = cleanCookie.secure ? "https:" : "http:";
-        const domain = cleanCookie.domain.startsWith(".")
-          ? cleanCookie.domain.substring(1)
-          : cleanCookie.domain;
-        cleanCookie.url = `${protocol}//${domain}${cleanCookie.path}`;
-
-        // Remove properties that cause errors in set()
-        if (hostOnly) {
-          delete cleanCookie.domain;
+        // 1. Fix Inconsistent Attributes
+        // "SameSite=None" (no_restriction) requires Secure=true to be set
+        if (cleanCookie.sameSite === "no_restriction") {
+          cleanCookie.secure = true;
         }
 
         // Strict rules for __Host- cookies
+        // They must be Secure and must NOT have a domain attribute
         if (cleanCookie.name.startsWith("__Host-")) {
           cleanCookie.secure = true;
+          delete cleanCookie.domain;
+        }
+
+        // 2. Prepare URL using the *final* secure state
+        // Use the original domain from cookieData as cleanCookie.domain might be deleted
+        const rawDomain = cookieData.domain;
+        const domain = rawDomain.startsWith(".")
+          ? rawDomain.substring(1)
+          : rawDomain;
+
+        // Ensure protocol matches the secure flag
+        const protocol = cleanCookie.secure ? "https:" : "http:";
+        cleanCookie.url = `${protocol}//${domain}${cleanCookie.path}`;
+
+        // 3. Final Cleanup for set()
+        // If it was hostOnly originally, we must NOT pass domain to set()
+        // (If we already deleted it for __Host-, this is safe/redundant)
+        if (hostOnly) {
           delete cleanCookie.domain;
         }
 
         try {
           await chrome.cookies.set(cleanCookie);
         } catch (e) {
-          // Ignore specific harmless errors or log them
-          console.error(`Error setting cookie ${cleanCookie.name}:`, e);
+          // Improved error logging
+          console.error(
+            `Error setting cookie ${cleanCookie.name} (Domain: ${domain}, Secure: ${cleanCookie.secure}, SameSite: ${cleanCookie.sameSite}):`,
+            e
+          );
         }
       });
     await Promise.all(setPromises);
