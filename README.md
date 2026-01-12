@@ -1,3 +1,9 @@
+<p align="center"><img src="icons/icon128.png"></p>
+
+<h1 align="center">CrossSession Sandbox</h1>
+
+<p align="center">English | <a href="README.zh_TW.md">繁體中文</a></p>
+
 # CrossSession Sandbox
 
 A powerful Chrome extension that allows you to manage multiple isolated browsing environments ("sandboxes") within the same browser profile. Seamlessly switch between accounts, bypass CORS restrictions, and manage temporary sessions with ease.
