@@ -1,4 +1,8 @@
-# 跨域沙箱 (CrossSession Sandbox)
+<p align="center"><img src="icons/icon128.png"></p>
+
+<h1 align="center">跨域沙箱 (CrossSession Sandbox)</h1>
+
+<p align="center"><a href="README">English</a> | 繁體中文</p>
 
 這是一個強大的 Chrome 擴充功能，允許您在同一個瀏覽器設定檔中管理多個隔離的瀏覽環境（稱為「沙箱」）。您可以無縫切換不同帳號、繞過 CORS 限制，並輕鬆管理臨時的工作階段。
 
